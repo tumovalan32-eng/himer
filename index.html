@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Химера">
+<meta name="theme-color" content="#ffffff">
+<title>Химера</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #f9f9f7;
+    --surface: #ffffff;
+    --border: #e8e8e4;
+    --text: #1a1a18;
+    --text-muted: #8a8a82;
+    --accent: #5b5bd6;
+    --accent-light: #ededfb;
+    --danger: #ff3b30;
+    --radius: 20px;
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  }
+
+  html, body {
+    height: 100%; height: 100dvh;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex; flex-direction: column;
+    height: 100%; height: 100dvh;
+    max-width: 480px; margin: 0 auto;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #5b5bd6, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(91,91,214,0.3);
+  }
+  .avatar svg { width: 20px; height: 20px; }
+
+  .header-info { flex: 1; }
+  .header-name { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-status {
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 5px; margin-top: 1px;
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #34c759; flex-shrink: 0;
+  }
+  .status-dot.speaking { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.listening { background: var(--danger); animation: pulse 0.6s infinite; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  .header-actions { display: flex; gap: 6px; }
+
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .icon-btn:active { transform: scale(0.92); background: var(--border); }
+  .icon-btn.active-tts { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+
+  /* Messages */
+  #messages {
+    flex: 1; overflow-y: auto;
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { display: none; }
+
+  /* Welcome */
+  .welcome {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex: 1; gap: 12px; padding: 40px 20px; text-align: center;
+  }
+  .welcome-icon {
+    width: 64px; height: 64px; border-radius: 22px;
+    background: linear-gradient(135deg, #5b5bd6, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+    box-shadow: 0 4px 16px rgba(91,91,214,0.3);
+  }
+  .welcome-icon svg { width: 30px; height: 30px; }
+  .welcome h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+  .welcome p { font-size: 14px; color: var(--text-muted); line-height: 1.5; max-width: 240px; }
+
+  .suggestions {
+    display: flex; flex-direction: column; gap: 8px;
+    width: 100%; max-width: 300px; margin-top: 8px;
+  }
+  .suggestion {
+    padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--surface);
+    font-size: 13px; color: var(--text); cursor: pointer;
+    text-align: left; transition: all 0.15s; line-height: 1.4;
+  }
+  .suggestion:active { background: var(--accent-light); border-color: var(--accent); }
+
+  /* Bubbles */
+  .message {
+    display: flex; flex-direction: column;
+    max-width: 82%; animation: fadeUp 0.2s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .message.user { align-self: flex-end; align-items: flex-end; }
+  .message.ai { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 11px 15px; border-radius: var(--radius);
+    font-size: 15px; line-height: 1.5; word-break: break-word;
+  }
+  .user .bubble { background: #1a1a18; color: #fff; border-bottom-right-radius: 6px; }
+  .ai .bubble {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-bottom-left-radius: 6px;
+    position: relative;
+  }
+
+  /* Play button on AI bubble */
+  .play-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 8px; padding: 4px 10px;
+    border-radius: 20px; border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 12px; color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .play-btn:active { background: var(--accent-light); color: var(--accent); }
+  .play-btn svg { width: 12px; height: 12px; }
+
+  .bubble p { margin: 0; }
+  .bubble p + p { margin-top: 8px; }
+
+  /* Typing */
+  .typing .bubble { padding: 14px 18px; }
+  .dots { display: flex; gap: 5px; align-items: center; height: 16px; }
+  .dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-muted); animation: bounce 1.2s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.15s; }
+  .dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* Input */
+  #input-area {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    background: var(--bg); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .input-row {
+    display: flex; align-items: flex-end; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; padding: 6px 6px 6px 16px;
+    transition: border-color 0.15s;
+  }
+  .input-row:focus-within { border-color: var(--accent); }
+
+  #user-input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-family: var(--font); font-size: 15px; color: var(--text);
+    resize: none; max-height: 100px; line-height: 1.5; padding: 5px 0;
+  }
+  #user-input::placeholder { color: var(--text-muted); }
+
+  /* Mic button */
+  #mic-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--bg); border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s; color: var(--text-muted);
+  }
+  #mic-btn.recording {
+    background: var(--danger); border-color: var(--danger); color: white;
+    animation: micPulse 1s infinite;
+  }
+  @keyframes micPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255,59,48,0); }
+  }
+  #mic-btn svg { width: 16px; height: 16px; }
+
+  #send-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s; opacity: 0.4;
+  }
+  #send-btn.active { opacity: 1; }
+  #send-btn:active { transform: scale(0.9); }
+  #send-btn svg { width: 16px; height: 16px; }
+
+  /* Voice overlay */
+  #voice-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(249,249,247,0.96);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  #voice-overlay.active { display: flex; }
+
+  .voice-ring {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: linear-gradient(135deg, #5b5bd6, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .voice-ring::before, .voice-ring::after {
+    content: '';
+    position: absolute; border-radius: 50%;
+    border: 2px solid rgba(91,91,214,0.3);
+    animation: ripple 1.5s infinite;
+  }
+  .voice-ring::before { width: 150px; height: 150px; }
+  .voice-ring::after { width: 180px; height: 180px; animation-delay: 0.4s; }
+
+  @keyframes ripple {
+    0% { transform: scale(0.9); opacity: 1; }
+    100% { transform: scale(1.1); opacity: 0; }
+  }
+
+  .voice-ring svg { width: 40px; height: 40px; color: white; }
+  .voice-label { font-size: 18px; font-weight: 500; color: var(--text); }
+  .voice-hint { font-size: 14px; color: var(--text-muted); }
+  .voice-cancel {
+    padding: 12px 28px; border-radius: 24px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 15px; color: var(--text); cursor: pointer;
+    margin-top: 8px; transition: all 0.15s;
+  }
+  .voice-cancel:active { background: var(--border); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4"/>
+        <path d="M12 14c-5 0-8 2-8 4v1h16v-1c0-2-3-4-8-4"/>
+      </svg>
+    </div>
+    <div class="header-info">
+      <div class="header-name">Химера</div>
+      <div class="header-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">готова помочь</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="tts-toggle" onclick="toggleTTS()" title="Озвучка">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </button>
+      <button class="icon-btn" onclick="clearChat()" title="Очистить">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+          <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="messages">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+      <h2>Привет, я Химера</h2>
+      <p>Говори или пиши — я слушаю и отвечаю голосом.</p>
+      <div class="suggestions">
+        <div class="suggestion" onclick="sendSuggestion(this)">💡 Придумай идею для выходных</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">✍️ Помоги написать сообщение</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">🧠 Объясни что-нибудь простыми словами</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <div class="input-row">
+      <textarea id="user-input" placeholder="Напиши или нажми 🎙️…" rows="1"
+        oninput="autoResize(this); toggleBtn()"
+        onkeydown="handleKey(event)"></textarea>
+      <button id="mic-btn" onclick="toggleMic()" title="Голосовой ввод">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <button id="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" fill="white">
+          <path d="M12 4l8 8H4l8-8z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Voice overlay -->
+<div id="voice-overlay">
+  <div class="voice-ring">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+    </svg>
+  </div>
+  <div class="voice-label" id="voice-label">Слушаю…</div>
+  <div class="voice-hint" id="voice-hint">Говорите, я вас слышу</div>
+  <button class="voice-cancel" onclick="stopMic()">Отмена</button>
+</div>
+
+<script>
+const API_URL = "https://api.anthropic.com/v1/messages";
+const SYSTEM = `Тебя зовут Химера. Ты голосовой ИИ-ассистент на телефоне пользователя.
+Отвечай на русском языке, если не попросят иначе.
+Говори естественно, как в разговоре — короткими фразами, без сложных списков и форматирования.
+Не используй звёздочки, хэштеги или markdown. Только чистый текст.
+Будь тёплой, живой и лаконичной. Не говори "Конечно!" или "Отличный вопрос!".`;
+
+let history = [];
+let isLoading = false;
+let ttsEnabled = true;
+let recognition = null;
+let isRecording = false;
+let currentUtterance = null;
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+const micBtn = document.getElementById('mic-btn');
+const ttsToggle = document.getElementById('tts-toggle');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const voiceOverlay = document.getElementById('voice-overlay');
+const voiceLabel = document.getElementById('voice-label');
+const voiceHint = document.getElementById('voice-hint');
+
+// TTS
+function setStatus(type, text) {
+  statusDot.className = 'status-dot' + (type ? ' ' + type : '');
+  statusText.textContent = text;
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  ttsToggle.classList.toggle('active-tts', ttsEnabled);
+  if (!ttsEnabled) stopSpeaking();
+}
+
+function speak(text) {
+  if (!ttsEnabled || !window.speechSynthesis) return;
+  stopSpeaking();
+  const clean = text.replace(/[*#_`]/g, '').trim();
+  currentUtterance = new SpeechSynthesisUtterance(clean);
+  currentUtterance.lang = 'ru-RU';
+  currentUtterance.rate = 1.05;
+  currentUtterance.pitch = 1.1;
+
+  // Try to pick a female Russian voice
+  const voices = speechSynthesis.getVoices();
+  const ruVoice = voices.find(v => v.lang.startsWith('ru') && v.name.toLowerCase().includes('fem'))
+    || voices.find(v => v.lang.startsWith('ru'));
+  if (ruVoice) currentUtterance.voice = ruVoice;
+
+  currentUtterance.onstart = () => setStatus('speaking', 'говорит…');
+  currentUtterance.onend = () => setStatus('', 'готова помочь');
+  currentUtterance.onerror = () => setStatus('', 'готова помочь');
+  speechSynthesis.speak(currentUtterance);
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  currentUtterance = null;
+}
+
+// Load voices
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+  speechSynthesis.getVoices();
+}
+
+// STT
+function toggleMic() {
+  if (isRecording) { stopMic(); return; }
+  startMic();
+}
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert('Ваш браузер не поддерживает распознавание речи. Попробуйте Chrome или Safari.');
+    return;
+  }
+  stopSpeaking();
+  recognition = new SR();
+  recognition.lang = 'ru-RU';
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.continuous = false;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    micBtn.classList.add('recording');
+    voiceOverlay.classList.add('active');
+    setStatus('listening', 'слушает…');
+    voiceLabel.textContent = 'Слушаю…';
+    voiceHint.textContent = 'Говорите, я вас слышу';
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    voiceLabel.textContent = final || interim || 'Слушаю…';
+    if (final) inputEl.value = final;
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    micBtn.classList.remove('recording');
+    voiceOverlay.classList.remove('active');
+    setStatus('', 'готова помочь');
+    if (inputEl.value.trim()) {
+      toggleBtn();
+      sendMessage();
+    }
+  };
+
+  recognition.onerror = (e) => {
+    isRecording = false;
+    micBtn.classList.remove('recording');
+    voiceOverlay.classList.remove('active');
+    setStatus('', 'готова помочь');
+    if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      addMessage('ai', 'Не удалось распознать речь. Попробуй ещё раз 🎙️');
+    }
+  };
+
+  recognition.start();
+}
+
+function stopMic() {
+  if (recognition) { recognition.abort(); recognition = null; }
+  isRecording = false;
+  micBtn.classList.remove('recording');
+  voiceOverlay.classList.remove('active');
+  setStatus('', 'готова помочь');
+}
+
+// UI helpers
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function toggleBtn() {
+  sendBtn.classList.toggle('active', inputEl.value.trim().length > 0);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendSuggestion(el) {
+  inputEl.value = el.textContent.replace(/^[\s\S]{2}\s/, '').trim();
+  toggleBtn();
+  sendMessage();
+}
+
+function addMessage(role, text) {
+  document.getElementById('welcome')?.remove();
+  const msg = document.createElement('div');
+  msg.className = `message ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (role === 'ai') {
+    bubble.innerHTML = formatText(text);
+    // Add play button
+    const playBtn = document.createElement('button');
+    playBtn.className = 'play-btn';
+    playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Воспроизвести`;
+    playBtn.onclick = () => speak(text);
+    bubble.appendChild(playBtn);
+  } else {
+    bubble.textContent = text;
+  }
+  msg.appendChild(bubble);
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return bubble;
+}
+
+function formatText(text) {
+  return text.replace(/[*#_`]/g, '')
+    .split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+}
+
+function showTyping() {
+  const msg = document.createElement('div');
+  msg.className = 'message ai typing'; msg.id = 'typing';
+  msg.innerHTML = `<div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div>`;
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function hideTyping() { document.getElementById('typing')?.remove(); }
+
+const WELCOME_HTML = `
+  <div class="welcome" id="welcome">
+    <div class="welcome-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </div>
+    <h2>Привет, я Химера</h2>
+    <p>Говори или пиши — я слушаю и отвечаю голосом.</p>
+    <div class="suggestions">
+      <div class="suggestion" onclick="sendSuggestion(this)">💡 Придумай идею для выходных</div>
+      <div class="suggestion" onclick="sendSuggestion(this)">✍️ Помоги написать сообщение</div>
+      <div class="suggestion" onclick="sendSuggestion(this)">🧠 Объясни что-нибудь простыми словами</div>
+    </div>
+  </div>`;
+
+function clearChat() {
+  history = [];
+  stopSpeaking();
+  messagesEl.innerHTML = WELCOME_HTML;
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || isLoading) return;
+
+  isLoading = true;
+  inputEl.value = ''; inputEl.style.height = 'auto';
+  sendBtn.classList.remove('active');
+  stopSpeaking();
+
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+  showTyping();
+  setStatus('', 'думает…');
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: history
+      })
+    });
+    const data = await res.json();
+    hideTyping();
+    const reply = data.content?.map(b => b.text || '').join('') || 'Что-то пошло не так 😔';
+    history.push({ role: 'assistant', content: reply });
+    addMessage('ai', reply);
+    speak(reply);
+  } catch {
+    hideTyping();
+    setStatus('', 'готова помочь');
+    addMessage('ai', 'Не удалось подключиться. Проверь интернет 📡');
+  }
+
+  isLoading = false;
+  setStatus('', 'готова помочь');
+}
+
+// Init TTS toggle state
+ttsToggle.classList.add('active-tts');
+</script>
+</body>
+</html>
